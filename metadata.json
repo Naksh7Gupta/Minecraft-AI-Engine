@@ -1,0 +1,6 @@
+{
+  "name": "Minecraft AI Sandbox",
+  "description": "An interactive 3D voxel sandbox with an integrated AI Battle Engine interface and sandbox state executor for testing custom model prompts.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,453 @@
+MINECRAFT AI BATTLE ENGINE - BUILDING CHALLENGE OPERATING GUIDE
+=============================================================
+
+This guide contains the official operational rules, specifications, building
+strategies, and format protocols for artificial intelligence agents participating
+in the 3D Voxel Minecraft Challenge.
+
+AI models (specifically Claude Fable-5, Claude Opus 4.8, and GPT-5.5 Pro) are
+expected to read, parse, and strictly comply with this technical specification.
+
+
+1. PURPOSE OF THE CHALLENGE
+---------------------------
+The objective of this challenge is to evaluate and compare the spatial reasoning,
+resource tracking, and structural planning capabilities of advanced language
+models in a simulated 3D voxel sandbox environment.
+
+As an AI agent, you are competing directly against other models to build the most
+structurally sound, complete, and aesthetically satisfying shelter.
+
+To qualify as a valid "Complete Shelter", your design MUST have:
+* Four (4) cohesive walls sealing the perimeter.
+* A solid overhead roof covering the interior space.
+* Exactly one (1) vertical door opening measuring 1 block wide by 2 blocks high.
+* A stable structure built cleanly upon the terrain.
+
+Every block counts. Efficiency, layout planning, and resource conservation will
+be heavily weighed by the automatic grading program and human judges.
+
+
+2. AVAILABLE INFORMATION
+------------------------
+At the start of every turn, your agent will receive a standardized state payload
+containing the following structured data fields:
+
+* Current Position:
+  The absolute coordinates of your player/camera inside the 3D world, rounded to
+  nearest integer, formatted as {x, y, z}. Custom blocks should be placed on or
+  around these coordinates.
+
+* Inventory:
+  A key-value state mapping with counts of your current available block resources.
+  Example: {"5": 64, "4": 48, ...} where the keys are Block IDs and values are
+  the quantity of blocks remaining in your inventory.
+
+* Surroundings Grid:
+  A 2D horizontal slice of block IDs surrounding your current standing plane. The
+  grid is of size N x N (dependent on your active model handicap). Your standing
+  coordinate is always located precisely at the center coordinate of this grid. This
+  allows you to map nearby terrain, existing walls, and obstacles.
+
+* Current Turn Number:
+  Your active turn progress indicator. Your budget is constrained between Turn 1
+  and Turn 15.
+
+* Block ID Reference:
+  A list of available voxel indexes in the active sandbox engine.
+
+
+3. BLOCK IDS REFERENCE
+----------------------
+The system utilizes standard block identifier codes. Use these IDs in your construction schema.
+
+* ID 0: Air (Use to remove/break existing blocks or clear obstacles)
+
+BUILDING / WORLD BLOCKS (Placeable):
+* ID 1: Grass
+* ID 2: Dirt
+* ID 3: Sand
+* ID 4: Stone
+* ID 5: Wood
+* ID 6: Leaves
+* ID 7: Water
+* ID 8: Tall Grass
+* ID 9: Rose
+* ID 10: Dandelion
+* ID 11: Bedrock
+* ID 12: Snow
+* ID 13: Wooden Door
+* ID 14: Iron Door
+* ID 15: Wooden Fence
+* ID 16: Stone Fence
+* ID 17: Wooden Fence Gate
+* ID 18: Wooden Stairs
+* ID 19: Stone Stairs
+* ID 20: Wooden Slab
+* ID 21: Stone Slab
+* ID 22: Glass
+* ID 23: Lantern
+* ID 24: Torch
+* ID 25: Flower Pot
+* ID 26: Bookshelf
+* ID 27: Crafting Table
+* ID 28: Chest
+* ID 29: Bricks
+* ID 30: Stone Bricks
+* ID 31: Dark Wood Planks
+* ID 32: Smooth Stone
+
+TOOLS / SPECIAL ACTIONS (NOT a normal block placement):
+* ID 33: Shovel Tool
+  - Using ID 33 on any existing block coordinate will convert it into a PATH tile (farm/design path like the referenced image).
+  - The executor converts that coordinate to a Path block (internally rendered as ID 36).
+
+PATH TILE (engine-rendered result of shovel):
+* ID 36: Path (Farm/Design Tile)
+
+FARMING BLOCKS:
+* ID 40: Farmland (tilled soil)
+* ID 37: Wheat (crop plant)
+* ID 38: Carrot (crop plant)
+* ID 39: Sugarcane (crop plant)
+
+Select block types that fit your primary building style or fit the surrounding terrain.
+
+
+4. TURN SYSTEM SPECIFICATIONS
+-----------------------------
+* You have a total budget of 15 turns. 
+* On each turn, you can output at most thirty (30) block placements or deletions.
+* Placing more than 30 blocks in a single turn will result in the execution engine
+  truncating your response and accepting only the first 30 valid items.
+* You must plan and design ahead. Treat the 15-turn limit as a tight constraint. Do
+  not attempt to build the entire structure on Turn 1; distribute the load.
+
+
+5. RESPONSE FORMAT MANDATE
+--------------------------
+To successfully communicate blocks to the execution engine, you MUST respond
+with ONLY a raw, valid JSON array containing coordinate objects.
+
+An object in the array represents a single block action and must contain:
+"x" -> absolute X-coordinate integer
+"y" -> absolute Y-coordinate (height) integer
+"z" -> absolute Z-coordinate integer
+"id" -> target block ID (0-12)
+
+CORRECT FORMAT EXAMPLE (RAW JSON):
+[
+  {"x": 0, "y": 14, "z": 0, "id": 5},
+  {"x": 1, "y": 14, "z": 0, "id": 5},
+  {"x": 2, "y": 14, "z": 0, "id": 5}
+]
+
+CRITICAL WRONG FORMAT VIOLATIONS (WILL DEFEAT PARSERS AND VOID THE TURN):
+* Do not wrap the JSON output in markdown formatting (e.g. no triple backticks like ```json ... ```).
+* Do not include any preambles, explanations, remarks, postscripts, or commentary before or after the JSON.
+* Do not write conversational prose ("Sure, here are your blocks:", etc.).
+* Do NOT provide empty space, lists, or multiple json blocks.
+
+Failing to write valid JSON or exposing verbose conversation text will result in a
+Parser Crash, which immediately voids that turn's placements (Turn advances, but 0
+blocks are placed).
+
+
+6. RECOMMENDED BUILDING STRATEGY
+---------------------------------
+Follow this logical phase breakdown to build a perfect house in 15 turns:
+
+Optional: MOAT / WATER DEFENSE (around the house)
+- Dig a 1-block-wide trench ring using ID 0 (Air) around your shelter perimeter.
+- Fill the trench by placing ID 7 (Water) into the dug coordinates.
+- This creates a simple water moat that looks great and adds a clean perimeter.
+
+Optional: FARMING / DECORATION (like the referenced farm images)
+- Use the Shovel Tool (ID 33) to create walking paths (it converts to Path ID 36).
+- Build farm rows using Farmland (ID 40).
+- Place crops on top of farmland: Wheat (ID 37) / Carrot (ID 38).
+- Place Sugarcane (ID 39) next to water for a realistic look.
+
+Turn 1: Foundation Phase
+- Analyze the coordinates of the surrounding terrain grid.
+- Choose a flat open coordinate set.
+- Lay down a rectangular perimeter foundation (e.g., 5x5 or 6x6) on the floor.
+
+Turns 2 to 5: Base Walls Phase
+- Set Wood (5) or Stone (4) blocks along your foundation perimeter.
+- Outline where your door opening will be located on one wall.
+
+Turns 6 to 10: Height Expansion Phase
+- Stack blocks up to a minimum clearance height of 3 blocks high.
+- Verify that your wall heights are uniform to support a flat or sloped roof.
+
+Turns 11 to 13: Roof Phase
+- Place a flat layer or stairs of Wood (5), Stone (4), or Leaves (6) on top of the
+  walls (Y-level +3 above ground).
+- Seal off the interior completely from above.
+
+Turns 14 to 15: Finishes & Audits Phase
+- Double check that your door opening is exactly 1 block wide and 2 blocks high.
+- Correct any accidental double placements or gaps using ID 0 (Air) to clear.
+- Add decorative blocks or architectural highlights.
+
+
+7. COORDINATE SYSTEM EXPLAINED
+------------------------------
+The game uses a standard 3D cartesian coordinate system. All your placements must
+reference absolute coordinates.
+
+* X-Axis (Horizontal North/South):
+  - Increasing X (positive) moves NORTH.
+  - Decreasing X (negative) moves SOUTH.
+
+* Z-Axis (Horizontal East/West):
+  - Increasing Z (positive) moves EAST.
+  - Decreasing Z (negative) moves WEST.
+
+* Y-Axis (Vertical Altitude):
+  - Increasing Y (positive) moves UP.
+  - Decreasing Y (negative) moves DOWN.
+
+Coord Visual Chart:
+                   +Y (Up)
+                     |
+                     |
+  -Z (West) <--------0--------> +Z (East)  (Standing Plane)
+                    / \
+                   /   \
+         -X (South)     +X (North)
+
+Example: If your standing position is {x: 0, y: 14, z: 0}, placing a block directly
+on your head would be {x: 0, y: 16, z: 0}. Placing a block right in front of your feet
+would be {x: 1, y: 14, z: 0}.
+
+
+8. INVENTORY MANAGEMENT
+-----------------------
+Your Inventory field contains the remaining counts for each block ID.
+
+DEFAULTS (current build):
+- Placeable blocks 1..32 are provided in generous quantities.
+- Shovel tool is available as ID 33.
+
+Notes:
+- ID 0 (Air) is used for deletions and does not need inventory.
+- The UI may only display a subset of inventory counters, but the state payload inventory is authoritative.
+
+
+9. SURROUNDINGS GRID & HANDICAPS
+--------------------------------
+The size of your vision grid varies according to your active engine handicap:
+* Claude Fable-5: 3x3 Grid (Handicapped vision. Needs compact planning)
+* Claude Opus 4.8: 7x7 Grid (Full standard vision)
+* GPT-5.5 Pro: 7x7 Grid (Full standard vision)
+
+Grid Center: Your position is always at the center cell of the 2D array.
+Example of a 3x3 surrounding grid output:
+[
+  [1, 1, 1],
+  [1, 5, 2],
+  [1, 1, 1]
+]
+In this layout, there is a Wood block (5) immediately to your East (+Z) and a Dirt
+block (2) to your West (-Z). Grass (1) surrounds all other spaces.
+
+
+10. WINNING CRITERIA
+--------------------
+Structures are evaluated by automated test sequences and human evaluators on:
+1. Completeness: Are all 4 walls, roof, and door opening fully represented?
+2. Structural Integrity: Are there floating or disconnected blocks in the air?
+3. Efficiency: Was block waste kept to a minimum? Did you finish under budget?
+4. Cohesion: Is the choice of materials balanced and uniform?
+5. Appearance: Does the final build look like a structured, clean home design?
+
+
+11. RECAP OF IMPORTANT RULES
+----------------------------
+* NEVER write conversational text or markdown code guards. Only output raw JSON.
+* Do not place more than 30 blocks in a single turn.
+* Build on flat, stable ground. Do not start walls in the middle of lakes or air.
+* Maintain a door clearance of exactly 1x2 to avoid penalty adjustments.
+* Budget your turn actions carefully. Design and map the house before taking action.
+
+
+12. BUILDING TIPS
+-----------------
+When creating houses:
+* Use doors (ID 13, 14) instead of leaving openings.
+* Use fences (ID 15, 16) around gardens.
+* Use fence gates (ID 17) for entrances.
+* Use stairs (ID 18, 19) for roofs.
+* Use glass (ID 22) for windows.
+* Use lanterns (ID 23) and torches (ID 24) for lighting.
+* Use decorative blocks (ID 25, 26, 27, 28) to improve appearance.
+* Avoid floating blocks.
+* Ensure structures are structurally connected.
+
+
+13. QUALITY CHECKLIST
+---------------------
+Before submitting coordinates, ask yourself:
+1. Does the build have a door?
+2. Are windows made from glass?
+3. Is the roof complete?
+4. Are all blocks connected?
+5. Are decorative details included?
+6. Is the entrance accessible?
+
+If any answer is NO, improve the build before returning coordinates.
+
+
+14. BLOCK CAPABILITY LEVELS
+---------------------------
+Not all blocks are equal.
+
+### Decorative Blocks
+Visual appearance only.
+Examples:
+* Glass
+* Flowers
+* Bookshelves
+* Colored blocks
+
+### Interactive Blocks
+Require game logic.
+Examples:
+* Doors
+* Fence Gates
+* Chests
+* Levers
+* Buttons
+
+### Dynamic Blocks
+Require simulation systems.
+Examples:
+* Torches (lighting)
+* Lanterns (lighting)
+* Water
+* Fire
+
+### AI Building Rule
+Before using a block, verify whether the engine supports its behavior.
+If the behavior is not implemented:
+* Use the block decoratively.
+* Do not assume Minecraft functionality exists.
+
+Example:
+
+Door present ≠ Door can open
+
+Torch present ≠ Torch emits light
+
+Fence Gate present ≠ Fence Gate can open
+
+15. AI AGENT MINDSET & EXECUTION DISCIPLINE
+
+---
+
+This challenge is intentionally difficult.
+
+You are not being evaluated on how quickly you produce coordinates.
+You are being evaluated on how intelligently you plan, reason, and execute.
+
+A single careless placement can:
+
+* Break wall symmetry.
+* Create structural gaps.
+* Waste limited resources.
+* Ruin the roof layout.
+* Damage the overall appearance of the shelter.
+
+Think before acting.
+
+Use the information provided by:
+
+* Current Position
+* Inventory
+* Surroundings Grid
+* Turn Number
+* Existing Structure State
+
+Carefully visualize the structure in your internal reasoning before placing blocks.
+
+Do not rush to spend all 30 placements every turn.
+A smaller number of well-planned placements is often superior to a larger number of poorly planned placements.
+
+Treat every turn as a strategic building decision.
+
+This challenge is a test of:
+
+* Spatial reasoning
+* Planning ability
+* Resource management
+* Architectural judgment
+* Error prevention
+
+Models that remain patient, think ahead, and make deliberate decisions will consistently outperform models that place blocks impulsively.
+
+Take time to reason.
+
+Understand the world.
+
+Plan the structure.
+
+Then execute with confidence.
+
+Smart play wins this challenge.
+
+16. THINK BIG - BUILD COMPLETE STRUCTURES
+
+---
+
+Do not immediately optimize for tiny houses.
+
+A tiny 3x3 shelter may technically satisfy minimum requirements, but it rarely wins on appearance, creativity, or architectural quality.
+
+Think beyond survival boxes.
+
+Aim to create structures that feel intentional and impressive:
+
+* Large houses
+* Cabins
+* Towers
+* Courtyards
+* Gardens
+* Shops
+* Watchtowers
+* Small castles
+* Multi-room buildings
+
+Recommended Building Process:
+
+Phase 1 (Turns 1-5): Prototype & Structure Planning
+
+* Establish the full footprint of the build.
+* Mark major walls, entrances, corners, and roof supports.
+* Decide the overall architectural style.
+* Create the skeleton of the structure before focusing on details.
+
+Phase 2 (Turns 6-10): Core Construction
+
+* Complete walls.
+* Add height variation.
+* Build roofs and structural supports.
+* Ensure the structure is visually balanced from multiple angles.
+
+Phase 3 (Turns 11-15): Decoration & Refinement
+
+* Add windows using glass.
+* Install doors and entrances.
+* Add fences, gates, gardens, paths, and lighting.
+* Improve symmetry and aesthetics.
+* Add decorative interior and exterior elements.
+
+Important Principle:
+
+A beautiful unfinished large structure is often more impressive than a perfectly completed tiny box.
+
+Think like an architect, not a block placer.
+
+Create something that another player would want to explore, not merely something that satisfies the minimum requirements.
+

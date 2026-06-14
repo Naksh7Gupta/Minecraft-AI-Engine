@@ -1,0 +1,1225 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Executor World State Manager</title>
+<style>
+  :root {
+    --accent-color: #da7756; /* Default: Claude Orange */
+    --accent-hover: #ea8a68;
+    --bg-dark: #0f1015;
+    --bg-card: #171821;
+    --border-color: rgba(255, 255, 255, 0.08);
+  }
+  
+  html, body {
+    margin: 0;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    background-color: var(--bg-dark);
+    color: #e2e8f0;
+    min-height: 100vh;
+  }
+
+  header {
+    background-color: #12131a;
+    border-bottom: 2px solid var(--accent-color);
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.4);
+    transition: all 0.3s ease;
+  }
+
+  .header-left {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .header-left h1 {
+    margin: 0;
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #fff;
+  }
+
+  .header-left p {
+    margin: 0;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #8c8ea3;
+    font-weight: bold;
+  }
+
+  .model-select-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .model-label {
+    font-size: 12px;
+    font-weight: bold;
+    color: #a0aec0;
+  }
+
+  #model-select {
+    background-color: #1e1f29;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 8px 16px;
+    cursor: pointer;
+    outline: none;
+    transition: all 0.2s;
+  }
+  
+  #model-select:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(218, 119, 86, 0.2);
+  }
+
+  .main-container {
+    max-width: 1200px;
+    margin: 24px auto;
+    padding: 0 16px;
+    display: grid;
+    grid-template-columns: 480px 1fr;
+    gap: 24px;
+  }
+
+  @media (max-width: 900px) {
+    .main-container {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .card {
+    background-color: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .card-title {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    color: #fff;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .inventory-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    max-height: 400px;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+
+  .inventory-item {
+    background: #0f1015;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 10px 4px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    font-family: monospace;
+  }
+  
+  .inventory-item span:first-child {
+    font-size: 9px;
+    color: #8c8ea3;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .inventory-item span:last-child {
+    font-size: 18px;
+    font-weight: 800;
+    color: #fff;
+  }
+
+  .inventory-item .block-color-indicator {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    position: absolute;
+    top: 4px;
+    right: 4px;
+  }
+
+  textarea {
+    background: #0c0d12;
+    border: 1px solid rgba(255,255,255,0.12);
+    border-radius: 8px;
+    color: #00ff66;
+    font-family: "Fira Code", "JetBrains Mono", monospace;
+    font-size: 12px;
+    padding: 12px;
+    width: 100%;
+    height: 110px;
+    resize: none;
+    box-sizing: border-box;
+    outline: none;
+    transition: all 0.2s;
+  }
+
+  textarea:focus {
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 1px var(--accent-color);
+  }
+
+  button {
+    background-color: var(--accent-color);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: inherit;
+  }
+
+  button:hover {
+    background-color: var(--accent-hover);
+    transform: translateY(-1px);
+  }
+
+  button:active {
+    transform: translateY(1px);
+  }
+
+  .button-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  .btn-secondary {
+    background-color: #2b2c3a;
+  }
+  .btn-secondary:hover {
+    background-color: #3f4055;
+  }
+
+  .btn-danger {
+    background-color: #3a2222;
+    border: 1px solid rgba(234, 67, 53, 0.2);
+  }
+  .btn-danger:hover {
+    background-color: #552a2a;
+  }
+
+  .btn-success {
+    background-color: #10a37f;
+  }
+  .btn-success:hover {
+    background-color: #18b68f;
+  }
+
+  .log-panel {
+    background-color: #090a0e;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    height: 100px;
+    overflow-y: auto;
+    font-family: "JetBrains Mono", monospace;
+    font-size: 11px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .log-item {
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    padding-bottom: 2px;
+  }
+  
+  .log-error { color: #f56565; }
+  .log-success { color: #48bb78; }
+
+  .viewer-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  #canvas-container {
+    background: #111219;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #world-canvas {
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    max-width: 100%;
+    aspect-ratio: 1/1;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 14px;
+    font-size: 11px;
+    justify-content: center;
+    color: #a0aec0;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .color-box {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+
+  /* Interactive floating tabs */
+  .switch-banner {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    z-index: 10;
+  }
+
+  .text-highlight {
+    color: var(--accent-color);
+    font-weight: bold;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1 id="title-model-display">🤖 Claude Opus 4.8 World</h1>
+    <p>Minecraft AI Voxel State Sandbox Executor</p>
+  </div>
+  
+  <div class="model-select-wrapper">
+    <span class="model-label">Switch Instance:</span>
+    <select id="model-select">
+      <option value="Claude Fable-5">Claude Fable-5 (3x3 handi)</option>
+      <option value="Claude Opus 4.8" selected>Claude Opus 4.8 (7x7)</option>
+      <option value="GPT-5.5 Pro">GPT-5.5 Pro (7x7)</option>
+    </select>
+  </div>
+</header>
+
+<div class="main-container">
+  
+  <!-- LEFT SIDEBAR: CONTROL SYSTEMS -->
+  <div class="sidebar">
+    
+    <!-- State Stats block -->
+    <div class="card">
+      <h3 class="card-title">📦 Simulation Inventory</h3>
+      <div class="inventory-grid">
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #228b22;"></div>
+          <span>Grass (1)</span>
+          <span id="inv-block-1">512</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #a0522d;"></div>
+          <span>Dirt (2)</span>
+          <span id="inv-block-2">512</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #eedc82;"></div>
+          <span>Sand (3)</span>
+          <span id="inv-block-3">512</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #808080;"></div>
+          <span>Stone (4)</span>
+          <span id="inv-block-4">512</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #8b5a2b;"></div>
+          <span>Wood (5)</span>
+          <span id="inv-block-5">512</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #2e8b57;"></div>
+          <span>Leaves (6)</span>
+          <span id="inv-block-6">512</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #4a90e2;"></div>
+          <span>Water (7)</span>
+          <span id="inv-block-7">512</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #7cb342;"></div>
+          <span>T.Grass (8)</span>
+          <span id="inv-block-8">512</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #e8376a;"></div>
+          <span>Rose (9)</span>
+          <span id="inv-block-9">512</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #ffeb3b;"></div>
+          <span>Dandel (10)</span>
+          <span id="inv-block-10">512</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #000000;"></div>
+          <span>Bedrock (11)</span>
+          <span id="inv-block-11">512</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #ffffff;"></div>
+          <span>Snow (12)</span>
+          <span id="inv-block-12">512</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #c89d7c;"></div>
+          <span>W.Door (13)</span>
+          <span id="inv-block-13">128</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #d3d3d3;"></div>
+          <span>I.Door (14)</span>
+          <span id="inv-block-14">128</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #d2691e;"></div>
+          <span>W.Fence (15)</span>
+          <span id="inv-block-15">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #5c5c5c;"></div>
+          <span>S.Fence (16)</span>
+          <span id="inv-block-16">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #b0845c;"></div>
+          <span>W.Gate (17)</span>
+          <span id="inv-block-17">128</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #8b6914;"></div>
+          <span>W.Stair (18)</span>
+          <span id="inv-block-18">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #696969;"></div>
+          <span>S.Stair (19)</span>
+          <span id="inv-block-19">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #9d6633;"></div>
+          <span>W.Slab (20)</span>
+          <span id="inv-block-20">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #808080;"></div>
+          <span>S.Slab (21)</span>
+          <span id="inv-block-21">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #add8e6;"></div>
+          <span>Glass (22)</span>
+          <span id="inv-block-22">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #ffd700;"></div>
+          <span>Lantern (23)</span>
+          <span id="inv-block-23">128</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #ff8c00;"></div>
+          <span>Torch (24)</span>
+          <span id="inv-block-24">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #8b4513;"></div>
+          <span>Pot (25)</span>
+          <span id="inv-block-25">128</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #6b4423;"></div>
+          <span>Bookshelf (26)</span>
+          <span id="inv-block-26">128</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #cd853f;"></div>
+          <span>C.Table (27)</span>
+          <span id="inv-block-27">128</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #d2b48c;"></div>
+          <span>Chest (28)</span>
+          <span id="inv-block-28">128</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #a52a2a;"></div>
+          <span>Bricks (29)</span>
+          <span id="inv-block-29">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #a9a9a9;"></div>
+          <span>S.Brick (30)</span>
+          <span id="inv-block-30">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #3d2511;"></div>
+          <span>D.Wood (31)</span>
+          <span id="inv-block-31">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #c0c0c0;"></div>
+          <span>Smooth (32)</span>
+          <span id="inv-block-32">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #5f5f5f;"></div>
+          <span>Gravel (33)</span>
+          <span id="inv-block-33">128</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #6d5a3a;"></div>
+          <span>B.Wood (34)</span>
+          <span id="inv-block-34">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #4a7c59;"></div>
+          <span>B.Leaves (35)</span>
+          <span id="inv-block-35">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #8b7355;"></div>
+          <span>Path (36)</span>
+          <span id="inv-block-36">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #d4a574;"></div>
+          <span>Wheat (37)</span>
+          <span id="inv-block-37">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #ff6347;"></div>
+          <span>Carrot (38)</span>
+          <span id="inv-block-38">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #90ee90;"></div>
+          <span>S.Cane (39)</span>
+          <span id="inv-block-39">256</span>
+        </div>
+        <div class="inventory-item">
+          <div class="block-color-indicator" style="background: #8b6914;"></div>
+          <span>Farmland (40)</span>
+          <span id="inv-block-40">384</span>
+        </div>
+      </div>
+      <div style="font-size: 11px; display: flex; justify-content: space-between; color: #a0aec0; margin-top: -6px;">
+        <span>Current Turn Counter: <strong id="turn-display" class="text-highlight">1 / 15</strong></span>
+        <span>Spawn Coord: <strong style="color: #fff;">(0, 14, 0)</strong></span>
+      </div>
+    </div>
+    
+    <!-- Turn paste execute block -->
+    <div class="card">
+      <h3 class="card-title">✍️ Paste & Execute Response</h3>
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <textarea id="ai-executor-input" placeholder='[{"x": 1, "y": 14, "z": -1, "id": 5}, {"x": 2, "y": 14, "z": -1, "id": 5}]'></textarea>
+      </div>
+      <button class="btn-success" id="btn-execute-turn" style="width: 100%;">▶ Execute Turn</button>
+      
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+        <span style="font-size: 11px; font-weight: bold; color: #8c8ea3; text-transform: uppercase;">Execution Log</span>
+        <div class="log-panel" id="execution-log">
+          <div class="log-item" style="color: #6b6b7f;">System idle. Ready to process AI coordinates response array.</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Actions and downloads -->
+    <div class="card">
+      <h3 class="card-title">📋 Simulation Commands</h3>
+      
+      <div class="button-row">
+        <button class="btn-secondary" id="btn-copy-prompt" style="flex: 1;">📋 Copy Next Turn Prompt</button>
+        <button class="btn-secondary" id="btn-export" style="flex: 1;">📤 Export State.json</button>
+      </div>
+      
+      <div class="button-row">
+        <button class="btn-secondary" id="btn-import-snippet" style="flex: 1; background: #2f354a; hover:background: #3e4663;">📥 Copy Snippet to 3D</button>
+        <button class="btn-danger" id="btn-reset" style="flex: 0.6;">🔄 Reset World</button>
+      </div>
+      
+      <div style="font-size: 10px; color: #888; text-align: center; margin-top: 4px;">
+        "Copy Snippet to 3D" generates code to paste directly into game.html browser console!
+      </div>
+    </div>
+    
+  </div>
+  
+  <!-- RIGHT WORLD VIEWER -->
+  <div class="viewer-layout">
+    
+    <div id="canvas-container">
+      <a href="/index.html" class="btn-secondary" style="position: absolute; top: 16px; left: 16px; text-decoration: none; border-radius: 6px; padding: 6px 12px; font-size: 11px; z-index: 100; font-weight: 600; display: flex; align-items: center; gap: 4px;">
+        🎮 Open 3D Minecraft Game
+      </a>
+      
+      <div style="align-self: flex-start; margin-bottom: 12px; font-weight: 700; color: #fff; display: flex; justify-content: space-between; width: 100%; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">
+        <span>📝 2D TOP-DOWN WORLD VIEW MAP</span>
+        <span id="block-total-info" style="font-weight: 500; font-size: 12px; color: #a1a1b5;">0 Blocks Placed</span>
+      </div>
+      
+      <canvas id="world-canvas" width="500" height="500"></canvas>
+      
+      <div class="legend">
+        <div class="legend-item"><div class="color-box" style="background: #8b5a2b;"></div><span>Wood</span></div>
+        <div class="legend-item"><div class="color-box" style="background: #808080;"></div><span>Stone</span></div>
+        <div class="legend-item"><div class="color-box" style="background: #a0522d;"></div><span>Dirt</span></div>
+        <div class="legend-item"><div class="color-box" style="background: #eedc82;"></div><span>Sand</span></div>
+        <div class="legend-item"><div class="color-box" style="background: #228b22;"></div><span>Grass</span></div>
+        <div class="legend-item"><div class="color-box" style="background: #2e8b57;"></div><span>Leaves</span></div>
+        <div class="legend-item"><div class="color-box" style="background: #ffffff;"></div><span>Snow</span></div>
+        <div class="legend-item"><div class="color-box" style="background: #ea4335; border-radius: 50%;"></div><span>Player spawn (red)</span></div>
+      </div>
+    </div>
+    
+  </div>
+</div>
+
+<script>
+// ================= STATE & LOGIC SYSTEM =================
+(function() {
+  const modelSelect = document.getElementById('model-select');
+  const titleDisplay = document.getElementById('title-model-display');
+  
+  // Starting values
+  // Give the model access to ALL block IDs (1..40) in generous quantities.
+  // (0 = Air is used for deletions, so it's intentionally not part of inventory.)
+  const DEFAULT_INVENTORY = {
+    "1": 512,    // grass
+    "2": 512,    // dirt
+    "3": 512,    // sand
+    "4": 512,    // stone
+    "5": 512,    // wood
+    "6": 512,    // leaves
+    "7": 512,    // water
+    "8": 512,    // tall grass
+    "9": 512,    // rose
+    "10": 512,   // dandelion
+    "11": 512,   // bedrock
+    "12": 512,   // snow
+    "13": 128,   // wooden door
+    "14": 128,   // iron door
+    "15": 256,   // wooden fence
+    "16": 256,   // stone fence
+    "17": 128,   // wooden fence gate
+    "18": 256,   // wooden stairs
+    "19": 256,   // stone stairs
+    "20": 256,   // wooden slab
+    "21": 256,   // stone slab
+    "22": 256,   // glass
+    "23": 128,   // lantern
+    "24": 256,   // torch
+    "25": 128,   // flower pot
+    "26": 128,   // bookshelf
+    "27": 128,   // crafting table
+    "28": 128,   // chest
+    "29": 256,   // bricks
+    "30": 256,   // stone bricks
+    "31": 256,   // dark wood planks
+    "32": 256,   // smooth stone
+    "33": 128,   // gravel
+    "34": 256,   // birch wood
+    "35": 256,   // birch leaves
+    "36": 256,   // path
+    "37": 256,   // wheat
+    "38": 256,   // carrot
+    "39": 256,   // sugarcane
+    "40": 384    // farmland
+  };
+  const DEFAULT_PLAYER_POS = { x: 0, y: 14, z: 0 };
+  
+  let currentModel = modelSelect.value;
+  let worldState = {
+    turn: 1,
+    blocks: [],
+    inventory: { ...DEFAULT_INVENTORY },
+    playerPosition: { ...DEFAULT_PLAYER_POS }
+  };
+  
+  // Theme color settings
+  const MODEL_COLORS = {
+    "Claude Fable-5": { accent: "#4285f4", hover: "#5c9df5" },
+    "Claude Opus 4.8": { accent: "#da7756", hover: "#ea8a68" },
+    "GPT-5.5 Pro": { accent: "#10a37f", hover: "#18b68f" }
+  };
+  
+  // Local storage management
+  function loadState(modelName) {
+    const key = `world_${modelName}`;
+    const stored = localStorage.getItem(key);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        
+        // Backfill missing fields from old versions
+        if (typeof parsed.turn !== 'number') parsed.turn = 1;
+        if (!Array.isArray(parsed.blocks)) parsed.blocks = [];
+        if (!parsed.inventory) parsed.inventory = { ...DEFAULT_INVENTORY };
+        if (!parsed.playerPosition) parsed.playerPosition = { ...DEFAULT_PLAYER_POS };
+        
+        worldState = parsed;
+      } catch (e) {
+        console.error("Failed to parse stored state: ", e);
+        resetStateToDefault();
+      }
+    } else {
+      resetStateToDefault();
+    }
+    updateUIOfModel(modelName);
+  }
+  
+  function saveState() {
+    const key = `world_${currentModel}`;
+    localStorage.setItem(key, JSON.stringify(worldState));
+    updateUIInventory();
+    drawWorldGrid();
+  }
+  
+  function resetStateToDefault() {
+    worldState = {
+      turn: 1,
+      blocks: [],
+      inventory: { ...DEFAULT_INVENTORY },
+      playerPosition: { ...DEFAULT_PLAYER_POS }
+    };
+  }
+  
+  function updateUIOfModel(modelName) {
+    currentModel = modelName;
+    document.title = `${modelName} World State`;
+    titleDisplay.textContent = `🤖 ${modelName} World`;
+    
+    // Set brand theme custom CSS parameters
+    const colors = MODEL_COLORS[modelName] || MODEL_COLORS["Claude Opus 4.8"];
+    document.documentElement.style.setProperty('--accent-color', colors.accent);
+    document.documentElement.style.setProperty('--accent-hover', colors.hover);
+    
+    // Update labels and logs
+    updateUIInventory();
+    drawWorldGrid();
+    
+    // Log setup message
+    clearLog();
+    addExecutionLog(`Switched simulation world instance to ${modelName}. Total blocks in database: ${worldState.blocks.length}.`, 'success');
+  }
+
+  function updateUIInventory() {
+    const inv = worldState.inventory;
+    document.getElementById('inv-wood').textContent = inv["5"] || 0;
+    document.getElementById('inv-stone').textContent = inv["4"] || 0;
+    document.getElementById('inv-dirt').textContent = inv["2"] || 0;
+    document.getElementById('inv-sand').textContent = inv["3"] || 0;
+    
+    // Update all block counts displayed
+    const blockIds = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "33", "34", "35", "36", "37", "38", "39", "40"];
+    blockIds.forEach(id => {
+      const el = document.getElementById(`inv-block-${id}`);
+      if (el) el.textContent = inv[id] || 0;
+    });
+    
+    document.getElementById('turn-display').textContent = `Turn ${worldState.turn} / 15`;
+    document.getElementById('block-total-info').textContent = `${worldState.blocks.length} Block(s) Placed`;
+  }
+  
+  function addExecutionLog(msg, type) {
+    const logPanel = document.getElementById('execution-log');
+    const item = document.createElement('div');
+    item.className = 'log-item';
+    if (type === 'error') item.className += ' log-error';
+    if (type === 'success') item.className += ' log-success';
+    
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    item.innerHTML = `<span style="color: #666;">[${timeStr}]</span> ${msg}`;
+    logPanel.appendChild(item);
+    logPanel.scrollTop = logPanel.scrollHeight;
+  }
+  
+  function clearLog() {
+    document.getElementById('execution-log').innerHTML = '';
+  }
+  
+  // Model switch listener
+  modelSelect.addEventListener('change', function() {
+    loadState(this.value);
+  });
+  
+  // ================= CANVAS GRAPHICS RENDER =================
+  function drawWorldGrid() {
+    const canvas = document.getElementById('world-canvas');
+    const ctx = canvas.getContext('2d');
+    const w = canvas.width;
+    const h = canvas.height;
+    
+    // Clear and background
+    ctx.fillStyle = '#0a0a0f';
+    ctx.fillRect(0, 0, w, h);
+    
+    const blocksList = worldState.blocks;
+    const playerPos = worldState.playerPosition || DEFAULT_PLAYER_POS;
+    
+    // Bounding bounds detection
+    let minX = -12, maxX = 12;
+    let minZ = -12, maxZ = 12;
+    
+    blocksList.forEach(b => {
+      if (b.x < minX) minX = b.x;
+      if (b.x > maxX) maxX = b.x;
+      if (b.z < minZ) minZ = b.z;
+      if (b.z > maxZ) maxZ = b.z;
+    });
+    
+    // Add margin buffer
+    minX -= 2; maxX += 2;
+    minZ -= 2; maxZ += 2;
+    
+    const diffX = maxX - minX + 1;
+    const diffZ = maxZ - minZ + 1;
+    
+    // Fit block cellSize inside bounds
+    const cellSize = Math.min((w - 40) / diffX, (h - 40) / diffZ);
+    const offsetX = (w - diffX * cellSize) / 2;
+    const offsetZ = (h - diffZ * cellSize) / 2;
+    
+    // Draw visual gridlines
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.035)';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= diffX; x++) {
+      ctx.beginPath();
+      ctx.moveTo(offsetX + x * cellSize, offsetZ);
+      ctx.lineTo(offsetX + x * cellSize, offsetZ + diffZ * cellSize);
+      ctx.stroke();
+    }
+    for (let z = 0; z <= diffZ; z++) {
+      ctx.beginPath();
+      ctx.moveTo(offsetX, offsetZ + z * cellSize);
+      ctx.lineTo(offsetX + diffX * cellSize, offsetZ + z * cellSize);
+      ctx.stroke();
+    }
+    
+    // Draw Block grids
+    blocksList.forEach(b => {
+      const gridX = b.x - minX;
+      const gridZ = b.z - minZ;
+      
+      let color = '#2b2c3a';
+      if (b.id === 5) color = '#8b5a2b';       // wood (brown)
+      else if (b.id === 4) color = '#808080';  // stone (gray)
+      else if (b.id === 2) color = '#a0522d';  // dirt (tan brown)
+      else if (b.id === 3) color = '#eedc82';  // sand (yellow sand)
+      else if (b.id === 1) color = '#228b22';  // grass (green)
+      else if (b.id === 6) color = '#2e8b57';  // leaves (dark leaf)
+      else if (b.id === 7) color = '#4a90e2';  // water (blue)
+      else if (b.id === 8) color = '#7cb342';  // tall grass (light green)
+      else if (b.id === 9) color = '#e8376a';  // rose (pink)
+      else if (b.id === 10) color = '#ffeb3b'; // dandelion (yellow)
+      else if (b.id === 11) color = '#000000'; // bedrock (black)
+      else if (b.id === 12) color = '#ffffff'; // snow (white)
+      else if (b.id === 13) color = '#c89d7c'; // wooden door
+      else if (b.id === 14) color = '#d3d3d3'; // iron door
+      else if (b.id === 15) color = '#8b5a2b'; // wooden fence
+      else if (b.id === 16) color = '#5c5c5c'; // stone fence
+      else if (b.id === 17) color = '#b0845c'; // wooden fence gate
+      else if (b.id === 18) color = '#8b5a2b'; // wooden stairs
+      else if (b.id === 19) color = '#808080'; // stone stairs
+      else if (b.id === 20) color = '#8b5a2b'; // wooden slab
+      else if (b.id === 21) color = '#808080'; // stone slab
+      else if (b.id === 22) color = '#add8e6'; // glass
+      else if (b.id === 23) color = '#ffd700'; // lantern
+      else if (b.id === 24) color = '#ff8c00'; // torch
+      else if (b.id === 25) color = '#ff6347'; // flower pot
+      else if (b.id === 26) color = '#8b5a2b'; // bookshelf
+      else if (b.id === 27) color = '#cd853f'; // crafting table
+      else if (b.id === 28) color = '#d2b48c'; // chest
+      else if (b.id === 29) color = '#a52a2a'; // bricks
+      else if (b.id === 30) color = '#a9a9a9'; // stone bricks
+      else if (b.id === 31) color = '#3d2511'; // dark wood planks
+      else if (b.id === 32) color = '#d3d3d3'; // smooth stone
+      else if (b.id === 33) color = '#5f5f5f'; // gravel
+      else if (b.id === 34) color = '#6d5a3a'; // birch wood
+      else if (b.id === 35) color = '#4a7c59'; // birch leaves
+      else if (b.id === 36) color = '#8b7355'; // path
+      else if (b.id === 37) color = '#d4a574'; // wheat
+      else if (b.id === 38) color = '#ff6347'; // carrot
+      else if (b.id === 39) color = '#90ee90'; // sugarcane
+      else if (b.id === 40) color = '#8b6914'; // farmland
+      else if (b.id === 0) return;             // air
+      
+      ctx.fillStyle = color;
+      ctx.fillRect(offsetX + gridX * cellSize + 1, offsetZ + gridZ * cellSize + 1, cellSize - 2, cellSize - 2);
+      
+      // Draw details about building turn
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.font = '8px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText(`T${b.turn}`, offsetX + gridX * cellSize + cellSize / 2, offsetZ + gridZ * cellSize + cellSize - 2);
+    });
+
+    // Draw coordinate axis guides at center (0, z) and (x, 0)
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 1.5;
+    const ax = 0 - minX;
+    const az = 0 - minZ;
+    if (ax >= 0 && ax <= diffX) {
+      ctx.beginPath();
+      ctx.moveTo(offsetX + ax * cellSize, offsetZ);
+      ctx.lineTo(offsetX + ax * cellSize, offsetZ + diffZ * cellSize);
+      ctx.stroke();
+    }
+    if (az >= 0 && az <= diffZ) {
+      ctx.beginPath();
+      ctx.moveTo(offsetX, offsetZ + az * cellSize);
+      ctx.lineTo(offsetX + diffX * cellSize, offsetZ + az * cellSize);
+      ctx.stroke();
+    }
+    
+    // Draw Red player position dot
+    const pGridX = playerPos.x - minX;
+    const pGridZ = playerPos.z - minZ;
+    
+    if (pGridX >= 0 && pGridX < diffX && pGridZ >= 0 && pGridZ < diffZ) {
+      ctx.beginPath();
+      ctx.arc(offsetX + pGridX * cellSize + cellSize / 2, offsetZ + pGridZ * cellSize + cellSize / 2, Math.max(5, cellSize / 5.5), 0, 2 * Math.PI);
+      ctx.fillStyle = '#ea4335';
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = '#ea4335';
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+  }
+  
+  // ================= ACTION HANDLERS =================
+  
+  // Execute Turn Action
+  document.getElementById('btn-execute-turn').addEventListener('click', function() {
+    const rawValue = document.getElementById('ai-executor-input').value.trim();
+    if (!rawValue) {
+       addExecutionLog("Error: Paste textarea is empty. Check inputs.", "error");
+       return;
+    }
+    
+    let blocksArr = [];
+    try {
+      let cleanVal = rawValue;
+      if (cleanVal.startsWith('```')) {
+        cleanVal = cleanVal.replace(/^```json\s*/i, '').replace(/```\s*$/, '');
+      }
+      const parsed = JSON.parse(cleanVal.trim());
+      
+      // Check if it's an array of arrays (up to 5 arrays of 30 blocks each)
+      if (Array.isArray(parsed) && parsed.length > 0 && Array.isArray(parsed[0])) {
+        // Multiple JSON arrays (up to 5, each up to 30 blocks)
+        const arrayList = parsed.slice(0, 5);
+        arrayList.forEach(arr => {
+          if (Array.isArray(arr)) {
+            blocksArr.push(...arr.slice(0, 30));
+          }
+        });
+      } else if (Array.isArray(parsed)) {
+        // Single JSON array (up to 30 blocks)
+        blocksArr = parsed;
+      } else {
+        addExecutionLog("Error: JSON must be an array or array of arrays of objects.", "error");
+        return;
+      }
+    } catch (e) {
+      addExecutionLog(`Error parsing JSON: ${e.message}`, "error");
+      return;
+    }
+    
+    if (blocksArr.length === 0) {
+      addExecutionLog("Warning: Input array contains zero coordinates block records.", "error");
+      return;
+    }
+    
+    // Verify structure and execute placement
+    let validCount = 0;
+    let overflowWarning = false;
+    
+    blocksArr.slice(0, 30).forEach(blockObj => {
+      const x = Number(blockObj.x);
+      const y = Number(blockObj.y);
+      const z = Number(blockObj.z);
+      const id = Number(blockObj.id);
+      if (isNaN(x) || isNaN(y) || isNaN(z) || isNaN(id)) {
+        return; // skip typing discrepancies
+      }
+      
+      // Add or replace block structure in state database
+      // Filter out block if already present at that exact coordinate to prevent clones
+      worldState.blocks = worldState.blocks.filter(b => !(b.x === x && b.y === y && b.z === z));
+      
+      // Special tool action: Shovel (ID 33)
+      // Instead of placing a block, it converts the target coordinate into a "path" tile.
+      // (Visually similar to Minecraft's grass path for farming / decoration.)
+      const PATH_ID = 36;
+      if (id === 33) {
+        // Convert existing block at coordinate into PATH_ID.
+        worldState.blocks = worldState.blocks.filter(b => !(b.x === x && b.y === y && b.z === z));
+        worldState.blocks.push({ x, y, z, id: PATH_ID, turn: worldState.turn });
+
+        // Decrement shovel inventory (33)
+        if (worldState.inventory[33] !== undefined) {
+          if (worldState.inventory[33] > 0) worldState.inventory[33]--;
+          else overflowWarning = true;
+        }
+      } else if (id !== 0) {
+        worldState.blocks.push({ x, y, z, id, turn: worldState.turn });
+        
+        // Decrement simulation inventories
+        if (worldState.inventory[id] !== undefined) {
+          if (worldState.inventory[id] > 0) {
+            worldState.inventory[id]--;
+          } else {
+            overflowWarning = true;
+          }
+        }
+      } else {
+        // ID:0 implies Air / Break Block
+        // do not keep in active drawings
+      }
+      
+      validCount++;
+    });
+    
+    // Add logs
+    const msg = `Turn ${worldState.turn} Executed: Placed ${validCount} block(s).`;
+    addExecutionLog(msg, 'success');
+    if (overflowWarning) {
+      addExecutionLog("⚠️ Inventory limit alert: AI placed blocks exceeding available counts. Continued placement successful.", "error");
+    }
+    
+    // Advance turns
+    worldState.turn++;
+    document.getElementById('ai-executor-input').value = '';
+    
+    saveState();
+  });
+  
+  // Turn Prompt Builder Generator
+  document.getElementById('btn-copy-prompt').addEventListener('click', function() {
+    const range = currentModel === 'Claude Fable-5' ? 3 : 7;
+    const playerPos = worldState.playerPosition || DEFAULT_PLAYER_POS;
+    const inventoryText = JSON.stringify(worldState.inventory);
+    
+    // Draw local surroundings representation from cached coordinate map
+    const surroundingsGrid = [];
+    const half = Math.floor(range / 2);
+    for (let dz = -half; dz <= half; dz++) {
+      const row = [];
+      for (let dx = -half; dx <= half; dx++) {
+        // Search virtual coordinates at standing altitude
+        const targetX = playerPos.x + dx;
+        const targetZ = playerPos.z + dz;
+        // Search if we placed structural blocks here
+        const found = worldState.blocks.find(b => b.x === targetX && b.z === targetZ);
+        // Default to Grass (1) if no block was custom placed yet, mimicking normal base levels
+        row.push(found ? found.id : 1);
+      }
+      surroundingsGrid.push(row);
+    }
+    
+    const surroundingsFormatted = surroundingsGrid.map(row => '[' + row.join(',') + ']').join('\n');
+    const posStr = `{x: ${playerPos.x}, y: ${playerPos.y}, z: ${playerPos.z}}`;
+    
+    const promptText = `You are an AI playing Minecraft. Goal: build a complete shelter (4 walls + roof + door opening) using available blocks.
+
+Current Position: ${posStr}
+Inventory: ${inventoryText}
+Surroundings Grid (${range}x${range}, center = your position):
+${surroundingsFormatted}
+Turn: ${worldState.turn} / 15
+
+Available Block ID Reference (ALL 40 blocks):
+Terrain: 0=air, 1=grass, 2=dirt, 3=sand, 4=stone, 5=wood, 6=leaves, 7=water, 8=tall grass, 9=rose, 10=dandelion, 11=bedrock, 12=snow, 33=gravel
+Trees: 34=birch wood, 35=birch leaves
+Structures: 13=wooden door, 14=iron door, 15=wooden fence, 16=stone fence, 17=wooden fence gate, 18=wooden stairs, 19=stone stairs, 20=wooden slab, 21=stone slab, 22=glass, 36=path
+Decoration: 23=lantern, 24=torch, 25=flower pot, 26=bookshelf, 27=crafting table, 28=chest, 29=bricks, 30=stone bricks, 31=dark wood planks, 32=smooth stone
+Farming: 37=wheat, 38=carrot, 39=sugarcane, 40=farmland
+
+Rules:
+* All coordinates in your JSON output MUST be ABSOLUTE coordinates. Calculate them by adding your intended relative offsets to the Current Position provided above.
+* Build walls at least 3 blocks high
+* Add a roof on top
+* Prefer placing authentic Doors (13, 14), Fences (15, 16), glass (22) for windows, and decorations for improved design quality!
+* Maintain a door opening of exactly 1x2 scale
+* You have access to ALL 40 block types with 2x inventory amounts
+* You can place up to 30 blocks per turn
+* You can submit up to 5 JSON arrays at once (5 × 30 = 150 blocks max)
+
+Respond ONLY with a valid JSON array or array of arrays:
+
+FORMAT 1 (Single array, up to 30 blocks):
+[{"x":0,"y":14,"z":0,"id":5}, {"x":1,"y":14,"z":0,"id":5}]
+
+FORMAT 2 (Multiple arrays, up to 5 arrays × 30 blocks each = 150 blocks max):
+[[{"x":0,"y":14,"z":0,"id":5}, {"x":1,"y":14,"z":0,"id":5}], [{"x":2,"y":14,"z":0,"id":4}]]
+
+No explanation. No markdown. Raw JSON only.`;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(promptText).then(() => {
+        addExecutionLog("📋 Copied custom turn prompt for " + currentModel + " input.", "success");
+      }).catch(err => {
+        fallbackClipboardCopy(promptText);
+      });
+    } else {
+      fallbackClipboardCopy(promptText);
+    }
+  });
+  
+  function fallbackClipboardCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try {
+      document.execCommand('copy');
+      addExecutionLog("📋 Copied custom turn prompt (fallback method).", "success");
+    } catch(e) {
+      addExecutionLog("Error copying automatically. Review developer console.", "error");
+      console.log(text);
+    }
+    document.body.removeChild(ta);
+  }
+  
+  // Export State Action
+  document.getElementById('btn-export').addEventListener('click', function() {
+    const exportData = {
+      model: currentModel,
+      turns: worldState.turn - 1,
+      blocks: worldState.blocks,
+      inventory: worldState.inventory
+    };
+    
+    const jsonStr = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `world_state_${currentModel.toLowerCase().replace(/\s+/g, '_')}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    addExecutionLog("📥 Downloaded state world JSON database for " + currentModel + ".", "success");
+  });
+  
+  // Copy import snippet to actual 3D Minecraft game console
+  document.getElementById('btn-import-snippet').addEventListener('click', function() {
+    if (worldState.blocks.length === 0) {
+      addExecutionLog("Error: No blocks present. Complete turns first.", "error");
+      return;
+    }
+    
+    const blockImportsStr = JSON.stringify(worldState.blocks);
+    const consoleSnippet = `// Minecraft AI Sandbox Import code
+(function() {
+  const blocks = ${blockImportsStr};
+  if (typeof setBlock !== 'function') {
+    alert("❌ Error: 'setBlock' function not found. Are you pasting in the 3D Minecraft console?");
+    return;
+  }
+  let count = 0;
+  blocks.forEach(b => {
+    setBlock(b.x, b.y, b.z, b.id);
+    count++;
+  });
+  console.log("Successfully imported " + count + " blocks into actual 3D environment!");
+  alert("Successfully imported " + count + " blocks into actual 3D environment!");
+})();`;
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(consoleSnippet).then(() => {
+        addExecutionLog("📥 Copied 3D Browser console import snippet! Paste directly inside game.html console.", "success");
+      }).catch(err => {
+        fallbackClipboardCopy(consoleSnippet);
+      });
+    } else {
+      fallbackClipboardCopy(consoleSnippet);
+    }
+  });
+  
+  // Reset world
+  document.getElementById('btn-reset').addEventListener('click', function() {
+    if (confirm("Are you sure you want to completely erase the virtual world database for " + currentModel + "?")) {
+      resetStateToDefault();
+      saveState();
+      addExecutionLog("🧹 Erased localStorage databases and restored baseline inventories for " + currentModel + ".", "success");
+    }
+  });
+  
+  // Initialize baseline loading
+  loadState(currentModel);
+})();
+</script>
+</body>
+</html>
