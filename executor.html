@@ -650,46 +650,46 @@
   // Give the model access to ALL block IDs (1..40) in generous quantities.
   // (0 = Air is used for deletions, so it's intentionally not part of inventory.)
   const DEFAULT_INVENTORY = {
-    "1": 512,    // grass
-    "2": 512,    // dirt
-    "3": 512,    // sand
-    "4": 512,    // stone
-    "5": 512,    // wood
-    "6": 512,    // leaves
-    "7": 512,    // water
-    "8": 512,    // tall grass
-    "9": 512,    // rose
-    "10": 512,   // dandelion
-    "11": 512,   // bedrock
-    "12": 512,   // snow
-    "13": 128,   // wooden door
-    "14": 128,   // iron door
-    "15": 256,   // wooden fence
-    "16": 256,   // stone fence
-    "17": 128,   // wooden fence gate
-    "18": 256,   // wooden stairs
-    "19": 256,   // stone stairs
-    "20": 256,   // wooden slab
-    "21": 256,   // stone slab
-    "22": 256,   // glass
-    "23": 128,   // lantern
-    "24": 256,   // torch
-    "25": 128,   // flower pot
-    "26": 128,   // bookshelf
-    "27": 128,   // crafting table
-    "28": 128,   // chest
-    "29": 256,   // bricks
-    "30": 256,   // stone bricks
-    "31": 256,   // dark wood planks
-    "32": 256,   // smooth stone
-    "33": 128,   // gravel
-    "34": 256,   // birch wood
-    "35": 256,   // birch leaves
-    "36": 256,   // path
-    "37": 256,   // wheat
-    "38": 256,   // carrot
-    "39": 256,   // sugarcane
-    "40": 384    // farmland
+    "1": 1024,    // grass
+    "2": 1024,    // dirt
+    "3": 1024,    // sand
+    "4": 1024,    // stone
+    "5": 1024,    // wood
+    "6": 1024,    // leaves
+    "7": 1024,    // water
+    "8": 1024,    // tall grass
+    "9": 1024,    // rose
+    "10": 1024,   // dandelion
+    "11": 1024,   // bedrock
+    "12": 1024,   // snow
+    "13": 256,    // wooden door
+    "14": 256,    // iron door
+    "15": 512,    // wooden fence
+    "16": 512,    // stone fence
+    "17": 256,    // wooden fence gate
+    "18": 512,    // wooden stairs
+    "19": 512,    // stone stairs
+    "20": 512,    // wooden slab
+    "21": 512,    // stone slab
+    "22": 512,    // glass
+    "23": 256,    // lantern
+    "24": 512,    // torch
+    "25": 256,    // flower pot
+    "26": 256,    // bookshelf
+    "27": 256,    // crafting table
+    "28": 256,    // chest
+    "29": 512,    // bricks
+    "30": 512,    // stone bricks
+    "31": 512,    // dark wood planks
+    "32": 512,    // smooth stone
+    "33": 256,    // gravel
+    "34": 512,    // birch wood
+    "35": 512,    // birch leaves
+    "36": 512,    // path
+    "37": 512,    // wheat
+    "38": 512,    // carrot
+    "39": 512,    // sugarcane
+    "40": 768     // farmland
   };
   const DEFAULT_PLAYER_POS = { x: 0, y: 14, z: 0 };
   
@@ -770,10 +770,15 @@
 
   function updateUIInventory() {
     const inv = worldState.inventory;
-    document.getElementById('inv-wood').textContent = inv["5"] || 0;
-    document.getElementById('inv-stone').textContent = inv["4"] || 0;
-    document.getElementById('inv-dirt').textContent = inv["2"] || 0;
-    document.getElementById('inv-sand').textContent = inv["3"] || 0;
+    const elWood = document.getElementById('inv-wood');
+    const elStone = document.getElementById('inv-stone');
+    const elDirt = document.getElementById('inv-dirt');
+    const elSand = document.getElementById('inv-sand');
+    
+    if (elWood) elWood.textContent = inv["5"] || 0;
+    if (elStone) elStone.textContent = inv["4"] || 0;
+    if (elDirt) elDirt.textContent = inv["2"] || 0;
+    if (elSand) elSand.textContent = inv["3"] || 0;
     
     // Update all block counts displayed
     const blockIds = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", "33", "34", "35", "36", "37", "38", "39", "40"];
@@ -782,8 +787,10 @@
       if (el) el.textContent = inv[id] || 0;
     });
     
-    document.getElementById('turn-display').textContent = `Turn ${worldState.turn} / 15`;
-    document.getElementById('block-total-info').textContent = `${worldState.blocks.length} Block(s) Placed`;
+    const elTurnDisplay = document.getElementById('turn-display');
+    const elBlockTotal = document.getElementById('block-total-info');
+    if (elTurnDisplay) elTurnDisplay.textContent = `Turn ${worldState.turn} / 15`;
+    if (elBlockTotal) elBlockTotal.textContent = `${worldState.blocks.length} Block(s) Placed`;
   }
   
   function addExecutionLog(msg, type) {
@@ -974,20 +981,17 @@
       }
       const parsed = JSON.parse(cleanVal.trim());
       
-      // Check if it's an array of arrays (up to 5 arrays of 30 blocks each)
+      // Enforce array of arrays format (1-5 arrays with up to 30 blocks each)
       if (Array.isArray(parsed) && parsed.length > 0 && Array.isArray(parsed[0])) {
-        // Multiple JSON arrays (up to 5, each up to 30 blocks)
+        // Array of arrays (up to 5 arrays, each up to 30 blocks)
         const arrayList = parsed.slice(0, 5);
         arrayList.forEach(arr => {
           if (Array.isArray(arr)) {
             blocksArr.push(...arr.slice(0, 30));
           }
         });
-      } else if (Array.isArray(parsed)) {
-        // Single JSON array (up to 30 blocks)
-        blocksArr = parsed;
       } else {
-        addExecutionLog("Error: JSON must be an array or array of arrays of objects.", "error");
+        addExecutionLog("Error: JSON must be in array-of-arrays format: [[{blocks}], [{blocks}], ...]", "error");
         return;
       }
     } catch (e) {
@@ -1004,7 +1008,7 @@
     let validCount = 0;
     let overflowWarning = false;
     
-    blocksArr.slice(0, 30).forEach(blockObj => {
+    blocksArr.forEach(blockObj => {
       const x = Number(blockObj.x);
       const y = Number(blockObj.y);
       const z = Number(blockObj.z);
@@ -1115,13 +1119,18 @@ Rules:
 * You can place up to 30 blocks per turn
 * You can submit up to 5 JSON arrays at once (5 × 30 = 150 blocks max)
 
-Respond ONLY with a valid JSON array or array of arrays:
+Respond ONLY with a valid JSON array of arrays format:
 
-FORMAT 1 (Single array, up to 30 blocks):
-[{"x":0,"y":14,"z":0,"id":5}, {"x":1,"y":14,"z":0,"id":5}]
+[[{"x":0,"y":14,"z":0,"id":5}, {"x":1,"y":14,"z":0,"id":5}], [{"x":2,"y":14,"z":0,"id":4}], ...]
 
-FORMAT 2 (Multiple arrays, up to 5 arrays × 30 blocks each = 150 blocks max):
-[[{"x":0,"y":14,"z":0,"id":5}, {"x":1,"y":14,"z":0,"id":5}], [{"x":2,"y":14,"z":0,"id":4}]]
+Each inner array can contain up to 30 block objects.
+You can have 1 to 5 inner arrays total.
+
+Example with 1 array:
+[[{"x":0,"y":14,"z":0,"id":5}, {"x":1,"y":14,"z":0,"id":5}]]
+
+Example with multiple arrays:
+[[{"x":0,"y":14,"z":0,"id":5}, {"x":1,"y":14,"z":0,"id":5}], [{"x":2,"y":14,"z":0,"id":4}, {"x":3,"y":14,"z":0,"id":4}]]
 
 No explanation. No markdown. Raw JSON only.`;
 

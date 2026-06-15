@@ -1194,7 +1194,7 @@ const hl=new THREE.LineSegments(new THREE.EdgesGeometry(new THREE.BoxGeometry(1.
 hl.visible=false;scene.add(hl);
 
 // ================= inventory + hotbar =================
-const counts={1:40,2:40,3:40,4:40,5:40,6:40,8:40,9:40,10:40,12:40,33:40,34:40,35:40};
+const counts={1:80,2:80,3:80,4:80,5:80,6:80,8:80,9:80,10:80,12:80,33:80,34:80,35:80};
 const hotbar=[1,2,4,5,6,3,12,8,9,1,2,4,5,6,3,12,8,9,1,2,4,5,6,3,12,8,9];
 let hotSel=0,invOpen=false;
 const hbEl=document.getElementById('hotbar');
@@ -1648,12 +1648,12 @@ loop();
   
   <div style="display: flex; flex-direction: column; gap: 4px;">
     <label>Status Message</label>
-    <div id="ai-status-msg" class="status-msg">Engine initialized. Ready.</div>
+    <div id="ai-log-container" class="ai-log-container" style="background: #0c0d12; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; height: 80px; overflow-y: auto; padding: 8px; font-size: 11px; color: #a0aec0;">System ready. Paste AI response below.</div>
   </div>
   
   <div style="display: flex; flex-direction: column; gap: 4px;">
     <label>Paste AI Response</label>
-    <textarea id="ai-response-input" placeholder='[{"x":1,"y":12,"z":3,"id":5}, ...]'></textarea>
+    <textarea id="ai-response-input" placeholder='[[{"x":1,"y":12,"z":3,"id":5}], ...]'></textarea>
   <div style="display: flex; gap: 8px;">
     <button class="btn-run" id="ai-btn-run" style="flex: 2;">▶ Run Turn</button>
     <button class="btn-reset" id="ai-btn-reset" style="flex: 1;">🔄 Reset</button>
@@ -1669,10 +1669,9 @@ loop();
 
   window.aiAddBlocks = function(blocksArray) {
     if (!Array.isArray(blocksArray)) return 0;
-    const limitBlocks = blocksArray.slice(0, 30);
     let placedCount = 0;
     
-    for (const block of limitBlocks) {
+    for (const block of blocksArray) {
       const bx = Math.round(Number(block.x));
       const by = Math.round(Number(block.y));
       const bz = Math.round(Number(block.z));
@@ -1838,16 +1837,25 @@ Interactive & Decorative Block ID reference:
 29=Bricks, 30=Stone Bricks, 31=Dark Wood Planks, 32=Smooth Stone
 
 Rules:
-* All coordinates in your JSON output MUST be ABSOLUTE coordinates. Calculate them by adding your intended relative offsets to the Current Position provided above.
+* All coordinates in your JSON output MUST be ABSOLUTE coordinates. Start near your current position!
+* For relative placement: Current X is ${pos.x}. To build 5 blocks AHEAD (in front), use x: ${pos.x + 5}
+* For relative placement: Current Z is ${pos.z}. To build RIGHT, use z: ${pos.z + 5}
+* Always use y: ${pos.y} for ground level, or y: ${pos.y + 1} for 1 block above
 * Build walls at least 3 blocks high
 * Add a roof on top
-* Prefer placing authentic Doors (13, 14), Fences (15, 16), glass (22) for windows, e.g. details to improve design quality!
+* Prefer placing authentic Doors (13, 14), Fences (15, 16), glass (22) for windows
 * Maintain a door opening of exactly 1x2 scale
-* You can place up to 30 blocks per turn
+* You can place up to 30 blocks per turn (150 blocks max with 5 arrays)
 
-Respond ONLY with a valid JSON array:
-[{"x":0,"y":14,"z":0,"id":5}, {"x":1,"y":14,"z":0,"id":5}]
-No explanation. No markdown. Raw JSON array only.`;
+Respond ONLY with a valid JSON array or array of arrays:
+
+Single array:
+[[{"x":0,"y":14,"z":0,"id":5}, {"x":1,"y":14,"z":0,"id":5}]]
+
+Multiple arrays (up to 5 arrays × 30 blocks each):
+[[{"x":0,"y":14,"z":0,"id":5}, ...], [{"x":30,"y":14,"z":0,"id":4}, ...]]
+
+No explanation. No markdown. Raw JSON only.`;
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(promptText).then(function() {
@@ -1912,6 +1920,7 @@ No explanation. No markdown. Raw JSON array only.`;
     }
 
     let parsed = null;
+    let blocksArr = [];
     try {
       let clean = txtInput;
       // Strip markdown json block wrappers
@@ -1925,24 +1934,35 @@ No explanation. No markdown. Raw JSON array only.`;
       return;
     }
 
-    if (!Array.isArray(parsed)) {
-      addLog('Error: AI response must be a JSON array.', 'error');
+    // Handle array-of-arrays format [[blocks], [blocks], ...]
+    if (Array.isArray(parsed) && parsed.length > 0 && Array.isArray(parsed[0])) {
+      const arrayList = parsed.slice(0, 5);
+      arrayList.forEach(arr => {
+        if (Array.isArray(arr)) {
+          blocksArr.push(...arr.slice(0, 30));
+        }
+      });
+    } else if (Array.isArray(parsed)) {
+      // Single flat array (for backward compatibility)
+      blocksArr = parsed;
+    } else {
+      addLog('Error: AI response must be a JSON array or array of arrays.', 'error');
       if (typeof playError === 'function') playError();
       return;
     }
 
-    if (parsed.length === 0) {
+    if (blocksArr.length === 0) {
       addLog('Warning: AI returned empty block array. Empty turn.', 'error');
       if (typeof playError === 'function') playError();
       return;
     }
 
-    const placed = window.aiAddBlocks(parsed);
+    const placed = window.aiAddBlocks(blocksArr);
     const model = modelSelect.value;
     
     // Log details of operations
-    const summary = parsed.slice(0, 5).map(b => `(${b.x},${b.y},${b.z}:id=${b.id})`).join(', ') + (parsed.length > 5 ? '...' : '');
-    const logMsg = `Turn ${window.aiTurn} (${model}): Placed ${placed} block(s). Base coords: ${summary}`;
+    const summary = blocksArr.slice(0, 5).map(b => `(${b.x},${b.y},${b.z}:id=${b.id})`).join(', ') + (blocksArr.length > 5 ? '...' : '');
+    const logMsg = `Turn ${window.aiTurn} (${model}): Placed ${placed} block(s). Coords: ${summary}`;
     
     window.aiBuildLog.push(logMsg);
     addLog(logMsg, 'success');
