@@ -1,6 +1,11 @@
 MINECRAFT AI BATTLE ENGINE - BUILDING CHALLENGE OPERATING GUIDE
 =============================================================
 
+Think this engine as Minecraft MCP - and you(AI Model) will be participating in that.
+
+Every time you had to give an array to me in JSON - inside that there should be 5 arrays -     with 0-30 blocks each - for example - [[],[],[],[],[]]
+every turn means this one array - [[],[],[],[],[]]
+
 This guide contains the official operational rules, specifications, building
 strategies, and format protocols for artificial intelligence agents participating
 in the 3D Voxel Minecraft Challenge.
